@@ -29,7 +29,7 @@ sudo podman run -d --rm --replace --name postgresql-quay \
   -e POSTGRES_DB=quay \
   -e POSTGRES_ADMIN_PASSWORD=adminpass \
   -p 5432:5432 \
-  -v $QUAY/postgres-quay:/var/lib/pgsql/data:Z \
+  -v $QUAY/postgres-quay:/var/lib/postgresql/data:Z \
   docker.io/library/postgres:12.1
 
 sleep 5
