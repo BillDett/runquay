@@ -48,7 +48,7 @@ podman run --detach \
   -e AWS_SECRET_ACCESS_KEY="${MINIO_PASS}" \
   -e AWS_DEFAULT_REGION="us-east-1" \
   public.ecr.aws/aws-cli/aws-cli \
-  --endpoint-url http://${MINIOIP}:9000 \
+  --endpoint-url http://localhost:9000 \
   s3api create-bucket --bucket ${BUCKET_NAME} || true
 
 
