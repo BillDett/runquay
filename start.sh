@@ -10,16 +10,30 @@
 export QUAY=$(pwd)
 
 echo "Starting minio..."
+MINIO_USER=miniouser
+MINIO_PASS=miniopassword
 mkdir -p $QUAY/objectstorage
 sudo podman run -d --rm --replace --name minio \
 	-p 9000:9000 -p 9001:9001 \
         -v $QUAY/objectstorage:/data:Z \
-	-e "MINIO_ROOT_USER=miniouser" \
-	-e  "MINIO_ROOT_PASSWORD=miniopassword" \
+	-e "MINIO_ROOT_USER=${MINIO_USER}" \
+	-e "MINIO_ROOT_PASSWORD=${MINIO_PASS}" \
 	quay.io/minio/minio server /data --console-address ":9001"
 echo "minio console available at http://localhost:9001"
 
+sleep 1
+
 MINIOIP=$(sudo podman inspect -f "{{.NetworkSettings.IPAddress}}" minio)
+
+echo "making sure the bucket is available..."
+sudo podman run --rm \
+  -e AWS_ACCESS_KEY_ID="${MINIO_USER}" \
+  -e AWS_SECRET_ACCESS_KEY="${MINIO_PASS}" \
+  -e AWS_DEFAULT_REGION="us-east-1" \
+  public.ecr.aws/aws-cli/aws-cli \
+  --endpoint-url http://${MINIOIP}:9000 \
+  s3api create-bucket --bucket ${BUCKET_NAME} || true
+
 
 echo "Starting Postgres..."
 mkdir -p $QUAY/postgres-quay
@@ -49,6 +63,7 @@ echo "Fixing config with Minio, Postgres and Redis IP addresses..."
 cat $QUAY/config/config_template.yaml | sed "s/{{MINIOIP}}/$MINIOIP/g" | sed "s/{{POSTGRESIP}}/$POSTGRESIP/g" | sed "s/{{REDISIP}}/$REDISIP/g" > $QUAY/config/config.yaml
 
 echo "Starting Quay..."
+mkdir -p $QUAY/storage
 sudo podman run -d --replace -p 8080:8080 -p 8443:8443  \
    --name=quay \
    -v $QUAY/config:/conf/stack:Z \
