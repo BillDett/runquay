@@ -24,7 +24,8 @@ podman pod create --name ${POD} \
   --publish 9000:9000 \
   --publish 9001:9001 \
   --publish 8080:8080 \
-  --publish 443:8443
+  --publish 6379:6379 \
+  --publish 8443:8443
 
 echo "Starting minio..."
 MINIO_USER=miniouser
