@@ -8,6 +8,7 @@
 #
 
 export QUAY=$(pwd)
+export BUCKET_NAME=quaybucket
 
 export POD=quay-pod
 if podman pod exists ${POD}; then
