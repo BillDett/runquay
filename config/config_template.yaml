@@ -12,13 +12,13 @@ DISTRIBUTED_STORAGE_CONFIG:
 #    - storage_path: /datastorage/registry
   garage:
     - RadosGWStorage
-    - access_key: GKe987d6052c9df41304ed3699
+    - access_key: {{GARAGE_ACCESS_KEY}}
       bucket_name: quaybucket
       hostname: localhost
       is_secure: false
       port: 3900
       region_name: garage
-      secret_key: 3b0ed557d0ecb245a520eaf43146e45683197582ca5c1dcb12ce579263cf0366
+      secret_key: {{GARAGE_SECRET_KEY}}
       storage_path: /datastorage/registry 
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS: []
 DISTRIBUTED_STORAGE_PREFERENCE:

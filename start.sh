@@ -21,38 +21,81 @@ fi
 echo "Creating pod ${POD}..."
 podman pod create --name ${POD} \
   --publish 5432:5432 \
-  --publish 9000:9000 \
-  --publish 9001:9001 \
+  --publish 3900:3900 \
+  --publish 3901:3901 \
+  --publish 3902:3902 \
+  --publish 3903:3903 \
   --publish 8080:8080 \
   --publish 6379:6379 \
   --publish 8443:8443
 
-echo "Starting minio..."
-MINIO_USER=miniouser
-MINIO_PASS=miniopassword
-mkdir -p $QUAY/objectstorage
+garage() {
+  podman exec -ti garage /garage "$@"
+}
+
+
+echo "Starting garage..."
+
+mkdir -p $QUAY/garage/meta
+mkdir -p $QUAY/garage/data
+cat > $QUAY/garage/garage.toml <<EOF
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+
+replication_factor = 1
+
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+rpc_secret = "$(openssl rand -hex 32)"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
+
+[s3_web]
+bind_addr = "[::]:3902"
+root_domain = ".web.garage.localhost"
+index = "index.html"
+
+[k2v_api]
+api_bind_addr = "[::]:3904"
+
+[admin]
+api_bind_addr = "[::]:3903"
+admin_token = "$(openssl rand -base64 32)"
+metrics_token = "$(openssl rand -base64 32)"
+EOF
 podman run --detach \
   --pod ${POD} \
-  --name minio \
-  -v $QUAY/objectstorage:/data:Z \
-  -e "MINIO_ROOT_USER=${MINIO_USER}" \
-  -e "MINIO_ROOT_PASSWORD=${MINIO_PASS}" \
-  quay.io/minio/minio server /data --console-address ":9001"
-echo "minio console available at http://localhost:9001"
+  --name garage \
+  -e RUST_LOG=garage=debug \
+  -v $QUAY/garage/garage.toml:/etc/garage.toml:Z \
+  -v $QUAY/garage/meta:/var/lib/garage/meta:Z \
+  -v $QUAY/garage/data:/var/lib/garage/data:Z \
+  docker.io/dxflrs/garage:v2.1.0
 
 sleep 1
 
-echo "making sure the bucket is available..."
-podman run --detach \
-  --pod ${POD} \
-  --name bucket_check \
-  -e AWS_ACCESS_KEY_ID="${MINIO_USER}" \
-  -e AWS_SECRET_ACCESS_KEY="${MINIO_PASS}" \
-  -e AWS_DEFAULT_REGION="us-east-1" \
-  public.ecr.aws/aws-cli/aws-cli \
-  --endpoint-url http://localhost:9000 \
-  s3api create-bucket --bucket ${BUCKET_NAME} || true
+garage status
+export GARAGE_NODE_ID=$(garage status | awk '/^ID/{getline; print $1}')
 
+echo "making sure garage node $GARAGE_NODE_ID is configured properly..."
+if $(garage bucket info $BUCKET_NAME > /dev/null 2>&1); then
+  echo "\tSee $BUCKET_NAME, assume garage is set up okay..."
+else
+  echo "\tDon't see $BUCKET_NAME...let's configure garage"
+  garage layout assign -z dc1 -c 1G "$GARAGE_NODE_ID"
+  garage layout apply --version 1
+  garage bucket create "$BUCKET_NAME"
+  export KO=$(garage key create "$BUCKET_NAME"_key)
+  export GARAGE_ACCESS_KEY=$(echo "$KO" | awk '/^Key ID/{print $3}')
+  export GARAGE_SECRET_KEY=$(echo "$KO" | awk '/^Secret key/{print $3}')
+  echo "\tAdding garage keys to quay config..."
+  cat $QUAY/config/config_template.yaml | sed "s/{{GARAGE_ACCESS_KEY}}/$GARAGE_ACCESS_KEY/g" | sed "s/{{GARAGE_SECRET_KEY}}/$GARAGE_SECRET_KEY/g" > $QUAY/config/config.yaml
+  garage bucket allow --read --write --owner $BUCKET_NAME --key "$BUCKET_NAME"_key
+fi
 
 echo "Starting Postgres..."
 mkdir -p $QUAY/postgres-quay
@@ -79,28 +122,12 @@ podman run --detach \
 
 
 echo "Starting Quay..."
-mkdir -p $QUAY/storage
 podman run --detach \
   --pod ${POD} \
   --name quay \
   -v $QUAY/config:/conf/stack:Z \
-  -v $QUAY/storage:/datastorage:Z \
-  quay.io/projectquay/quay:3.15.0
+   quay.io/projectquay/quay:3.15.0
 echo "quay.io console available at http://localhost:8080"
-
-# Optionally start the backup minio server
-if [ "$1" = "bkp" ]; then
-	echo; echo;
-        mkdir -p $QUAY/backupstorage
-        podman run --detach \
-          --pod ${POD} \
-          --name bkpminio \
-       	  -v $QUAY/backupstorage:/data:Z \
-	  -e "MINIO_ROOT_USER=miniouser" \
-          -e  "MINIO_ROOT_PASSWORD=miniopassword" \
-          quay.io/minio/minio server /data --console-address ":7001"
-        echo "backup minio console available at http://localhost:7001"
-fi
 
 sleep 3
 
