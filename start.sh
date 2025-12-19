@@ -126,7 +126,8 @@ podman run --detach \
   --pod ${POD} \
   --name quay \
   -v $QUAY/config:/conf/stack:Z \
-   quay.io/projectquay/quay:3.15.0
+   localhost/quay:3.16
+
 echo "quay.io console available at http://localhost:8080"
 
 sleep 3
