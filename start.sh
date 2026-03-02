@@ -97,8 +97,8 @@ else
   garage bucket allow --read --write --owner $BUCKET_NAME --key "$BUCKET_NAME"_key
 fi
 
-echo "Starting Postgres..."
-mkdir -p $QUAY/postgres-quay
+echo "Starting Postgres 18..."
+mkdir -p $QUAY/postgres18-quay
 podman run --detach \
   --pod ${POD} \
   --name postgresql-quay \
@@ -106,8 +106,8 @@ podman run --detach \
   -e POSTGRES_PASSWORD=quaypass \
   -e POSTGRES_DB=quay \
   -e POSTGRES_ADMIN_PASSWORD=adminpass \
-  -v $QUAY/postgres-quay:/var/lib/postgresql/data:Z \
-  docker.io/library/postgres:12.1
+  -v $QUAY/postgres18-quay:/var/lib/postgresql:Z \
+  docker.io/library/postgres:18.3
 
 sleep 5
 
@@ -125,7 +125,9 @@ echo "Starting Quay..."
 podman run --detach \
   --pod ${POD} \
   --name quay \
+  -e RED_HAT_QUAY=true \
   -v $QUAY/config:/conf/stack:Z \
+  -v $QUAY/storage:/datastorage:Z \
    localhost/quay:3.16
 
 echo "quay.io console available at http://localhost:8080"
