@@ -8,6 +8,8 @@
 #
 
 export QUAY=$(pwd)
+export QUAY_IMAGE=quay.io/projectquay/quay:3.17.0
+
 export BUCKET_NAME=quaybucket
 
 export POD=quay-pod
@@ -121,14 +123,21 @@ podman run --detach \
   docker.io/library/redis:latest
 
 
-echo "Starting Quay..."
+echo "Starting Quay with ${QUAY_IMAGE}..."
 podman run --detach \
   --pod ${POD} \
   --name quay \
   -e RED_HAT_QUAY=true \
   -v $QUAY/config:/conf/stack:Z \
   -v $QUAY/storage:/datastorage:Z \
-   localhost/quay:3.16
+  ${QUAY_IMAGE}
+
+# start up a mirror worker too
+podman run --detach \
+  --pod ${POD} \
+  --name mirror-worker \
+  -v $QUAY/config:/conf/stack:Z \
+   ${QUAY_IMAGE} repomirror
 
 echo "quay.io console available at http://localhost:8080"
 

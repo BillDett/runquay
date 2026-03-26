@@ -27,6 +27,10 @@ DISTRIBUTED_STORAGE_PREFERENCE:
     - garage
 ENTERPRISE_LOGO_URL: /static/img/quay-horizontal-whiteblue-nobackground.svg
 FEATURE_MAILING: false
+FEATURE_ORG_MIRROR: true
+FEATURE_REPO_MIRROR: true
+FEATURE_PROXY_CACHE: true
+REPO_MIRROR_TLS_VERIFY: false
 SECRET_KEY: e9bd34f4-900c-436a-979e-7530e5d74ac8
 USER_EVENTS_REDIS:
     host: localhost
